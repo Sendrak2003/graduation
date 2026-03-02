@@ -1,0 +1,164 @@
+services:
+  postgres-wallet:
+    image: postgres:15
+    container_name: postgres-wallet
+    env_file:
+      - gw-currency-wallet/config.env
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-wallet-data:/var/lib/postgresql/data
+      - ./gw-currency-wallet/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+      - ./gw-currency-wallet/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wallet -d wallet"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-exchanger:
+    image: postgres:15
+    container_name: postgres-exchanger
+    env_file:
+      - gw-exchanger/config.env
+    environment:
+      POSTGRES_USER: exchanger
+      POSTGRES_PASSWORD: exchanger
+      POSTGRES_DB: exchanger
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-exchanger-data:/var/lib/postgresql/data
+      - ./gw-exchanger/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+      - ./gw-exchanger/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U exchanger -d exchanger"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - microservices-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - microservices-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  gw-exchanger:
+    build:
+      context: ./gw-exchanger
+      dockerfile: Dockerfile
+    container_name: gw-exchanger
+    env_file:
+      - gw-exchanger/config.env
+    environment:
+      DB_HOST: postgres-exchanger
+    depends_on:
+      postgres-exchanger:
+        condition: service_healthy
+    ports:
+      - "50051:50051"
+    networks:
+      - microservices-network
+    restart: on-failure
+
+  gw-currency-wallet:
+    build:
+      context: ./gw-currency-wallet
+      dockerfile: Dockerfile
+    container_name: gw-currency-wallet
+    env_file:
+      - gw-currency-wallet/config.env
+    environment:
+      DB_HOST: postgres-wallet
+      EXCHANGER_GRPC_HOST: gw-exchanger
+      KAFKA_BROKERS: kafka:29092
+    depends_on:
+      postgres-wallet:
+        condition: service_healthy
+      gw-exchanger:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks:
+      - microservices-network
+    restart: on-failure
+
+  gw-notification:
+    build:
+      context: ./gw-notification
+      dockerfile: Dockerfile
+    container_name: gw-notification
+    env_file:
+      - gw-notification/config.env
+    environment:
+      MONGO_URI: mongodb://admin:admin@mongodb:27017
+      KAFKA_BROKERS: kafka:29092
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: on-failure
+
+networks:
+  microservices-network:
+    driver: bridge
+
+volumes:
+  postgres-wallet-data:
+  postgres-exchanger-data:
+  mongodb-data:
