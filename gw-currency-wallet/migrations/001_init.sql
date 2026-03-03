@@ -1,6 +1,6 @@
 -- Создание таблицы пользователей
 CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
+    id VARCHAR(36) PRIMARY KEY,
     username VARCHAR(255) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Создание таблицы кошельков
 CREATE TABLE IF NOT EXISTS wallets (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    user_id VARCHAR(36) REFERENCES users(id) ON DELETE CASCADE,
     currency VARCHAR(3) NOT NULL CHECK (currency IN ('USD', 'RUB', 'EUR')),
     balance DECIMAL(15, 2) DEFAULT 0.00 CHECK (balance >= 0),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS wallets (
 -- Создание таблицы транзакций
 CREATE TABLE IF NOT EXISTS transactions (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    user_id VARCHAR(36) REFERENCES users(id) ON DELETE CASCADE,
     type VARCHAR(50) NOT NULL CHECK (type IN ('deposit', 'withdraw', 'exchange')),
     amount DECIMAL(15, 2) NOT NULL CHECK (amount > 0),
     currency VARCHAR(3) NOT NULL CHECK (currency IN ('USD', 'RUB', 'EUR')),
