@@ -1,11 +1,18 @@
 package service
 
-import "gw-currency-wallet/internal/repository"
+import (
+	"gw-currency-wallet/internal/repository"
+	"gw-currency-wallet/internal/utils/auth"
+)
 
-type WalletService struct {
-	repo *repository.WalletRepository
+type Services struct {
+	UserService   *UserService
+	WalletService *WalletService
 }
 
-func NewWalletService(repo *repository.WalletRepository) *WalletService {
-	return &WalletService{repo: repo}
+func NewServices(repos *repository.Repositories, jwtManager *auth.Manager) *Services {
+	return &Services{
+		UserService:   NewUserService(repos.UserRepository),
+		WalletService: NewWalletService(repos.WalletRepository),
+	}
 }

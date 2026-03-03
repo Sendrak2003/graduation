@@ -4,13 +4,10 @@ go 1.24.0
 
 require (
 	github.com/lib/pq v1.11.2
-	go.uber.org/zap v1.26.0
 	google.golang.org/grpc v1.79.1
 )
 
 require (
-	github.com/golang/protobuf v1.5.4 // indirect
-	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect

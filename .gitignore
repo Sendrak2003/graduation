@@ -16,3 +16,6 @@ config.env
 
 # OS
 .DS_Store
+
+#exe
+.exe

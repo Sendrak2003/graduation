@@ -1,1 +1,321 @@
-// swagger.yaml
+basePath: /api/v1
+definitions:
+  handler.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  handler.RefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  handler.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        maxLength: 100
+        minLength: 6
+        type: string
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  http.DepositRequest:
+    properties:
+      amount:
+        type: number
+      currency:
+        enum:
+        - USD
+        - EUR
+        - RUB
+        type: string
+    required:
+    - amount
+    - currency
+    type: object
+  http.WithdrawRequest:
+    properties:
+      amount:
+        type: number
+      currency:
+        enum:
+        - USD
+        - EUR
+        - RUB
+        type: string
+    required:
+    - amount
+    - currency
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API для управления кошельками
+  title: Wallet API
+  version: "1.0"
+paths:
+  /balance:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает баланс указанной валюты в кошельке пользователя
+      parameters:
+      - description: Валюта
+        enum:
+        - USD
+        - EUR
+        - RUB
+        in: query
+        name: currency
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить баланс кошелька
+      tags:
+      - wallet
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Аутентифицирует пользователя и возвращает access токен
+      parameters:
+      - description: Данные для входа
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Access токен
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Ошибка валидации
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Неверные учетные данные
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Авторизация пользователя
+      tags:
+      - auth
+  /refresh:
+    post:
+      consumes:
+      - application/json
+      description: Принимает refresh токен и возвращает новый access токен
+      parameters:
+      - description: Refresh токен
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Новый access токен
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Ошибка валидации
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Неверный refresh токен
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновление access токена
+      tags:
+      - auth
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Создает нового пользователя с логином, email и паролем
+      parameters:
+      - description: Данные для регистрации
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Пользователь успешно зарегистрирован
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Ошибка валидации или пользователь уже существует
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Регистрация пользователя
+      tags:
+      - auth
+  /wallet/deposit:
+    post:
+      consumes:
+      - application/json
+      description: Пополняет баланс кошелька указанной валютой
+      parameters:
+      - description: Данные для пополнения
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.DepositRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Пополнить кошелек
+      tags:
+      - wallet
+  /wallet/withdraw:
+    post:
+      consumes:
+      - application/json
+      description: Снимает указанную сумму в указанной валюте с кошелька
+      parameters:
+      - description: Данные для снятия
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.WithdrawRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Снять средства с кошелька
+      tags:
+      - wallet
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

@@ -17,10 +17,13 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 
 	_ "gw-currency-wallet/docs"
+	"gw-currency-wallet/internal/config"
+	"gw-currency-wallet/internal/handler"
 	httpHandler "gw-currency-wallet/internal/handler/http"
 	"gw-currency-wallet/internal/middleware"
 	"gw-currency-wallet/internal/repository"
 	"gw-currency-wallet/internal/service"
+	"gw-currency-wallet/internal/utils/auth"
 )
 
 // @title Wallet API
@@ -28,6 +31,10 @@ import (
 // @description API для управления кошельками
 // @host localhost:8080
 // @BasePath /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
 
 func main() {
 	port := os.Getenv("APP_PORT")
@@ -61,11 +68,22 @@ func main() {
 
 	log.Println("Database connected successfully")
 
-	repo := repository.NewWalletRepository(db)
-	svc := service.NewWalletService(repo)
-	walletHandler := httpHandler.NewWalletHandler(svc)
-	handler := httpHandler.NewHandler(walletHandler)
+	authCfg := config.LoadAuth()
+	jwtManager := auth.New(
+		authCfg.Secret,
+		authCfg.AccessTTL,
+		authCfg.RefreshTTL,
+	)
 
+	repos := repository.NewRepositories(db)
+
+	services := service.NewServices(repos, jwtManager)
+
+	authHandler := handler.NewAuthHandler(services.UserService, jwtManager)
+	walletHandler := httpHandler.NewWalletHandler(services.WalletService)
+	mainHandler := httpHandler.NewHandler(walletHandler, authHandler, jwtManager)
+
+	// Настройка роутера
 	router := gin.Default()
 
 	router.Use(middleware.NewPanicRecoveryMiddleware(nil))
@@ -80,7 +98,7 @@ func main() {
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	httpHandler.RegisterRoutes(router, handler)
+	httpHandler.RegisterRoutes(router, mainHandler)
 
 	srv := &http.Server{
 		Addr:         ":" + port,

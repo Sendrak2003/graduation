@@ -1,14 +1,13 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
 RUN apk add --no-cache git
 
 COPY go.mod go.sum* ./
+RUN go mod download
 
 COPY . .
-
-RUN go mod tidy && go mod download && go mod verify
 
 RUN go install github.com/swaggo/swag/cmd/swag@latest
 RUN $(go env GOPATH)/bin/swag init -g cmd/main.go -o docs
@@ -22,6 +21,7 @@ WORKDIR /app
 RUN apk --no-cache add ca-certificates
 
 COPY --from=builder /app/main .
+COPY --from=builder /app/docs ./docs
 
 EXPOSE 8080
 
