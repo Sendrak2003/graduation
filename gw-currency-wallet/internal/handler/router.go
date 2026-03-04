@@ -1,7 +1,6 @@
-package http
+package handler
 
 import (
-	"gw-currency-wallet/internal/handler"
 	"gw-currency-wallet/internal/middleware"
 	"gw-currency-wallet/internal/utils/auth"
 
@@ -10,11 +9,11 @@ import (
 
 type Handler struct {
 	walletHandler *WalletHandler
-	authHandler   *handler.AuthHandler
+	authHandler   *AuthHandler
 	jwtManager    *auth.Manager
 }
 
-func NewHandler(walletHandler *WalletHandler, authHandler *handler.AuthHandler, jwtManager *auth.Manager) *Handler {
+func NewHandler(walletHandler *WalletHandler, authHandler *AuthHandler, jwtManager *auth.Manager) *Handler {
 	return &Handler{
 		walletHandler: walletHandler,
 		authHandler:   authHandler,
