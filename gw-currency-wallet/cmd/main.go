@@ -87,6 +87,7 @@ func main() {
 
 	router := gin.Default()
 
+	router.Use(middleware.LoggingMiddleware(logger))
 	router.Use(middleware.NewPanicRecoveryMiddleware(logger))
 
 	router.GET("/health", func(c *gin.Context) {
