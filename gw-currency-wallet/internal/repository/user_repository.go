@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"gw-currency-wallet/internal/models"
+	"gw-currency-wallet/pkg/models"
 )
 
 type UserRepository struct {
@@ -29,6 +29,9 @@ func (r *UserRepository) CreateUser(
 		email,
 		password_hash,
 	)
+	if err != nil && isInvalidUUIDError(err) {
+		return ErrInvalidUUID
+	}
 	return err
 }
 
@@ -57,6 +60,9 @@ func (r *UserRepository) GetByID(ctx context.Context, userID string) (*models.Us
 	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
+		if isInvalidUUIDError(err) {
+			return nil, ErrInvalidUUID
+		}
 		return nil, err
 	}
 	return &user, nil

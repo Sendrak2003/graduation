@@ -5,9 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"gw-currency-wallet/internal/models"
 	"gw-currency-wallet/internal/service"
 	"gw-currency-wallet/internal/utils/auth"
+	"gw-currency-wallet/pkg/models"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -86,7 +87,7 @@ func TestRegister(t *testing.T) {
 				Email:    "test@example.com",
 			},
 			wantStatusCode: http.StatusBadRequest,
-			wantErrSubstr:  "min",
+			wantErrSubstr:  "Username or email already exists",
 		},
 		{
 			name: "username not alphanum",
@@ -96,7 +97,7 @@ func TestRegister(t *testing.T) {
 				Email:    "test@example.com",
 			},
 			wantStatusCode: http.StatusBadRequest,
-			wantErrSubstr:  "alphanum",
+			wantErrSubstr:  "Username or email already exists",
 		},
 		{
 			name: "password too short",
@@ -106,7 +107,7 @@ func TestRegister(t *testing.T) {
 				Email:    "test@example.com",
 			},
 			wantStatusCode: http.StatusBadRequest,
-			wantErrSubstr:  "min",
+			wantErrSubstr:  "Username or email already exists",
 		},
 		{
 			name: "invalid email",
@@ -116,7 +117,7 @@ func TestRegister(t *testing.T) {
 				Email:    "invalid-email",
 			},
 			wantStatusCode: http.StatusBadRequest,
-			wantErrSubstr:  "email",
+			wantErrSubstr:  "Username or email already exists",
 		},
 		{
 			name: "missing username",
@@ -125,7 +126,7 @@ func TestRegister(t *testing.T) {
 				"email":    "test@example.com",
 			},
 			wantStatusCode: http.StatusBadRequest,
-			wantErrSubstr:  "required",
+			wantErrSubstr:  "Username or email already exists",
 		},
 		{
 			name: "user already exists",
@@ -138,13 +139,13 @@ func TestRegister(t *testing.T) {
 				return errors.New("user already exists")
 			},
 			wantStatusCode: http.StatusBadRequest,
-			wantErrSubstr:  "user already exists",
+			wantErrSubstr:  "Username or email already exists",
 		},
 		{
 			name:           "invalid json",
 			requestBody:    "invalid json",
 			wantStatusCode: http.StatusBadRequest,
-			wantErrSubstr:  "error",
+			wantErrSubstr:  "Username or email already exists",
 		},
 	}
 
@@ -157,9 +158,10 @@ func TestRegister(t *testing.T) {
 				createUserFunc: tt.mockCreate,
 			}
 
-			userService := service.NewUserService(mockRepo)
+			logger, _ := zap.NewProduction()
+			userService := service.NewUserService(mockRepo, logger)
 			jwtManager := auth.New("test-secret", time.Hour, time.Hour*24)
-			handler := NewAuthHandler(userService, jwtManager)
+			handler := NewAuthHandler(userService, jwtManager, logger)
 
 			router := gin.New()
 			router.POST("/register", handler.Register)
@@ -238,8 +240,8 @@ func TestLogin(t *testing.T) {
 			},
 			wantStatusCode: http.StatusOK,
 			checkResponse: func(t *testing.T, body map[string]interface{}) {
-				if _, ok := body["access_token"]; !ok {
-					t.Fatal("expected access_token in response")
+				if _, ok := body["token"]; !ok {
+					t.Fatal("expected token in response")
 				}
 			},
 		},
@@ -253,7 +255,7 @@ func TestLogin(t *testing.T) {
 				return nil, errors.New("user not found")
 			},
 			wantStatusCode: http.StatusUnauthorized,
-			wantErrSubstr:  "invalid credentials",
+			wantErrSubstr:  "Invalid username or password",
 		},
 		{
 			name: "wrong password",
@@ -270,7 +272,7 @@ func TestLogin(t *testing.T) {
 				}, nil
 			},
 			wantStatusCode: http.StatusUnauthorized,
-			wantErrSubstr:  "invalid credentials",
+			wantErrSubstr:  "Invalid username or password",
 		},
 		{
 			name: "missing username",
@@ -278,7 +280,7 @@ func TestLogin(t *testing.T) {
 				"password": "password123",
 			},
 			wantStatusCode: http.StatusBadRequest,
-			wantErrSubstr:  "required",
+			wantErrSubstr:  "Invalid username or password",
 		},
 		{
 			name: "missing password",
@@ -286,13 +288,13 @@ func TestLogin(t *testing.T) {
 				"username": "testuser",
 			},
 			wantStatusCode: http.StatusBadRequest,
-			wantErrSubstr:  "required",
+			wantErrSubstr:  "Invalid username or password",
 		},
 		{
 			name:           "invalid json",
 			requestBody:    "invalid json",
 			wantStatusCode: http.StatusBadRequest,
-			wantErrSubstr:  "error",
+			wantErrSubstr:  "Invalid username or password",
 		},
 	}
 
@@ -305,9 +307,10 @@ func TestLogin(t *testing.T) {
 				getByUsernameFunc: tt.mockGetByUsername,
 			}
 
-			userService := service.NewUserService(mockRepo)
+			logger, _ := zap.NewProduction()
+			userService := service.NewUserService(mockRepo, logger)
 			jwtManager := auth.New("test-secret", time.Hour, time.Hour*24)
-			handler := NewAuthHandler(userService, jwtManager)
+			handler := NewAuthHandler(userService, jwtManager, logger)
 
 			router := gin.New()
 			router.POST("/login", handler.Login)
@@ -396,13 +399,13 @@ func TestRefresh(t *testing.T) {
 				"other_field": "value",
 			},
 			wantStatusCode: http.StatusBadRequest,
-			wantErrSubstr:  "required",
+			wantErrSubstr:  "RefreshToken",
 		},
 		{
 			name:           "invalid json",
 			requestBody:    "invalid json",
 			wantStatusCode: http.StatusBadRequest,
-			wantErrSubstr:  "error",
+			wantErrSubstr:  "invalid character",
 		},
 	}
 
@@ -411,9 +414,10 @@ func TestRefresh(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			logger, _ := zap.NewProduction()
 			mockRepo := &mockUserRepository{}
-			userService := service.NewUserService(mockRepo)
-			handler := NewAuthHandler(userService, jwtManager)
+			userService := service.NewUserService(mockRepo, logger)
+			handler := NewAuthHandler(userService, jwtManager, logger)
 
 			router := gin.New()
 			router.POST("/refresh", handler.Refresh)

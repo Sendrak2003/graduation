@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,11 +14,11 @@ import (
 	_ "github.com/lib/pq"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"go.uber.org/zap"
 
 	_ "gw-currency-wallet/docs"
 	"gw-currency-wallet/internal/config"
 	"gw-currency-wallet/internal/handler"
-	httpHandler "gw-currency-wallet/internal/handler/http"
 	"gw-currency-wallet/internal/middleware"
 	"gw-currency-wallet/internal/repository"
 	"gw-currency-wallet/internal/service"
@@ -37,6 +36,9 @@ import (
 // @description Type "Bearer" followed by a space and JWT token.
 
 func main() {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
 	port := os.Getenv("APP_PORT")
 	if port == "" {
 		port = "8080"
@@ -53,7 +55,7 @@ func main() {
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("db connection failed: %v", err)
+		logger.Fatal("db connection failed", zap.Error(err))
 	}
 	defer db.Close()
 
@@ -63,10 +65,10 @@ func main() {
 	db.SetConnMaxIdleTime(time.Minute * 10)
 
 	if err := db.Ping(); err != nil {
-		log.Fatalf("db ping failed: %v", err)
+		logger.Fatal("db ping failed", zap.Error(err))
 	}
 
-	log.Println("Database connected successfully")
+	logger.Info("Database connected successfully")
 
 	authCfg := config.LoadAuth()
 	jwtManager := auth.New(
@@ -77,16 +79,16 @@ func main() {
 
 	repos := repository.NewRepositories(db)
 
-	services := service.NewServices(repos, jwtManager)
+	services := service.NewServices(repos, jwtManager, logger)
 
-	authHandler := handler.NewAuthHandler(services.UserService, jwtManager)
-	walletHandler := httpHandler.NewWalletHandler(services.WalletService)
-	mainHandler := httpHandler.NewHandler(walletHandler, authHandler, jwtManager)
+	authHandler := handler.NewAuthHandler(services.UserService, jwtManager, logger)
+	walletHandler := handler.NewWalletHandler(services.WalletService, logger)
+	mainHandler := handler.NewHandler(walletHandler, authHandler, jwtManager)
 
-	// Настройка роутера
 	router := gin.Default()
 
-	router.Use(middleware.NewPanicRecoveryMiddleware(nil))
+	router.Use(middleware.LoggingMiddleware(logger))
+	router.Use(middleware.NewPanicRecoveryMiddleware(logger))
 
 	router.GET("/health", func(c *gin.Context) {
 		if err := db.Ping(); err != nil {
@@ -98,7 +100,7 @@ func main() {
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	httpHandler.RegisterRoutes(router, mainHandler)
+	handler.RegisterRoutes(router, mainHandler)
 
 	srv := &http.Server{
 		Addr:         ":" + port,
@@ -109,9 +111,9 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Server starting on port %s", port)
+		logger.Info("Server starting", zap.String("port", port))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server start failed: %v", err)
+			logger.Fatal("server start failed", zap.Error(err))
 		}
 	}()
 
@@ -119,14 +121,14 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down server...")
+	logger.Info("Shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		logger.Fatal("Server forced to shutdown", zap.Error(err))
 	}
 
-	log.Println("Server exited gracefully")
+	logger.Info("Server exited gracefully")
 }

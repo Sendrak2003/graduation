@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"fmt"
 )
 
 type WalletRepository struct {
@@ -27,6 +26,9 @@ func (r *WalletRepository) GetBalance(ctx context.Context, userID string, curren
 		return 0, nil
 	}
 	if err != nil {
+		if isInvalidUUIDError(err) {
+			return 0, ErrInvalidUUID
+		}
 		return 0, err
 	}
 
@@ -57,9 +59,15 @@ func (r *WalletRepository) Deposit(ctx context.Context, userID string, currency 
 			amount,
 		)
 		if err != nil {
+			if isInvalidUUIDError(err) {
+				return ErrInvalidUUID
+			}
 			return err
 		}
 	} else if err != nil {
+		if isInvalidUUIDError(err) {
+			return ErrInvalidUUID
+		}
 		return err
 	} else {
 		_, err = tx.ExecContext(
@@ -93,14 +101,17 @@ func (r *WalletRepository) Withdraw(ctx context.Context, userID string, currency
 	).Scan(&walletID, &balance)
 
 	if err == sql.ErrNoRows {
-		return fmt.Errorf("wallet not found")
+		return ErrWalletNotFound
 	}
 	if err != nil {
+		if isInvalidUUIDError(err) {
+			return ErrInvalidUUID
+		}
 		return err
 	}
 
 	if balance < amount {
-		return fmt.Errorf("insufficient funds")
+		return ErrInsufficientFunds
 	}
 
 	_, err = tx.ExecContext(
