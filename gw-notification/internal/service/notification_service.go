@@ -3,44 +3,38 @@ package service
 import (
 	"context"
 	"gw-notification/internal/repository"
-	"log"
+
+	"go.uber.org/zap"
 )
 
-type Transaction struct {
-	UserID        string
-	TransactionID string
-	Amount        float64
-	Currency      string
-	Type          string
-	Timestamp     string
-}
-
 type NotificationService struct {
-	repo *repository.MongoRepository
+	repo   *repository.MongoRepository
+	logger *zap.Logger
 }
 
-func NewNotificationService(repo *repository.MongoRepository) *NotificationService {
+func NewNotificationService(repo *repository.MongoRepository, logger *zap.Logger) *NotificationService {
 	return &NotificationService{
-		repo: repo,
+		repo:   repo,
+		logger: logger,
 	}
 }
 
-func (s *NotificationService) ProcessTransaction(ctx context.Context, tx *Transaction) error {
-	log.Printf("Processing transaction: %s, amount: %.2f %s", tx.TransactionID, tx.Amount, tx.Currency)
+func (s *NotificationService) ProcessTransaction(ctx context.Context, tx *repository.LargeTransactionDoc) error {
+	s.logger.Info("processing large transaction",
+		zap.String("transaction_id", tx.TransactionID),
+		zap.String("user_id", tx.UserID),
+		zap.Float64("amount", tx.Amount),
+		zap.String("from_currency", tx.FromCurrency),
+		zap.String("to_currency", tx.ToCurrency))
 
-	// Convert to repository document
-	doc := &repository.LargeTransactionDoc{
-		UserID:        tx.UserID,
-		TransactionID: tx.TransactionID,
-		Amount:        tx.Amount,
-		Currency:      tx.Currency,
-		Type:          tx.Type,
-	}
-
-	if err := s.repo.SaveTransaction(ctx, doc); err != nil {
+	if err := s.repo.SaveTransaction(ctx, tx); err != nil {
+		s.logger.Error("failed to save transaction",
+			zap.String("transaction_id", tx.TransactionID),
+			zap.Error(err))
 		return err
 	}
 
-	log.Printf("Transaction %s saved successfully", tx.TransactionID)
+	s.logger.Info("transaction saved successfully",
+		zap.String("transaction_id", tx.TransactionID))
 	return nil
 }
