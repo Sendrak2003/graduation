@@ -28,7 +28,6 @@ func NewNotificationService(repo *repository.MongoRepository) *NotificationServi
 func (s *NotificationService) ProcessTransaction(ctx context.Context, tx *Transaction) error {
 	log.Printf("Processing transaction: %s, amount: %.2f %s", tx.TransactionID, tx.Amount, tx.Currency)
 
-	// Convert to repository document
 	doc := &repository.LargeTransactionDoc{
 		UserID:        tx.UserID,
 		TransactionID: tx.TransactionID,
@@ -37,7 +36,11 @@ func (s *NotificationService) ProcessTransaction(ctx context.Context, tx *Transa
 		Type:          tx.Type,
 	}
 
+	log.Printf("Saving to MongoDB: UserID=%s, TransactionID=%s, Amount=%.2f, Currency=%s, Type=%s",
+		doc.UserID, doc.TransactionID, doc.Amount, doc.Currency, doc.Type)
+
 	if err := s.repo.SaveTransaction(ctx, doc); err != nil {
+		log.Printf("Error saving transaction: %v", err)
 		return err
 	}
 

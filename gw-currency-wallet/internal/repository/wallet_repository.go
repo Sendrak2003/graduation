@@ -23,7 +23,7 @@ func (r *WalletRepository) GetBalance(ctx context.Context, userID string, curren
 	).Scan(&balance)
 
 	if err == sql.ErrNoRows {
-		return 0, nil
+		return 0, ErrWalletNotFound
 	}
 	if err != nil {
 		if isInvalidUUIDError(err) {
@@ -122,6 +122,88 @@ func (r *WalletRepository) Withdraw(ctx context.Context, userID string, currency
 	)
 	if err != nil {
 		return err
+	}
+
+	return tx.Commit()
+}
+
+func (r *WalletRepository) ExchangeCurrency(ctx context.Context, userID, fromCurrency, toCurrency string, fromAmount, toAmount float64) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var fromWalletID string
+	var fromBalance float64
+	err = tx.QueryRowContext(
+		ctx,
+		`SELECT id, balance FROM wallets WHERE user_id = $1 AND currency = $2 FOR UPDATE`,
+		userID,
+		fromCurrency,
+	).Scan(&fromWalletID, &fromBalance)
+
+	if err == sql.ErrNoRows {
+		return ErrWalletNotFound
+	}
+	if err != nil {
+		if isInvalidUUIDError(err) {
+			return ErrInvalidUUID
+		}
+		return err
+	}
+
+	if fromBalance < fromAmount {
+		return ErrInsufficientFunds
+	}
+
+	_, err = tx.ExecContext(
+		ctx,
+		`UPDATE wallets SET balance = balance - $1 WHERE id = $2`,
+		fromAmount,
+		fromWalletID,
+	)
+	if err != nil {
+		return err
+	}
+
+	var toWalletID string
+	err = tx.QueryRowContext(
+		ctx,
+		`SELECT id FROM wallets WHERE user_id = $1 AND currency = $2 FOR UPDATE`,
+		userID,
+		toCurrency,
+	).Scan(&toWalletID)
+
+	if err == sql.ErrNoRows {
+		_, err = tx.ExecContext(
+			ctx,
+			`INSERT INTO wallets (user_id, currency, balance) VALUES ($1, $2, $3)`,
+			userID,
+			toCurrency,
+			toAmount,
+		)
+		if err != nil {
+			if isInvalidUUIDError(err) {
+				return ErrInvalidUUID
+			}
+			return err
+		}
+	} else if err != nil {
+		if isInvalidUUIDError(err) {
+			return ErrInvalidUUID
+		}
+		return err
+	} else {
+		_, err = tx.ExecContext(
+			ctx,
+			`UPDATE wallets SET balance = balance + $1 WHERE id = $2`,
+			toAmount,
+			toWalletID,
+		)
+		if err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit()

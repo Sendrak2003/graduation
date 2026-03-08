@@ -1,14 +1,16 @@
 FROM golang:1.25-alpine AS builder
 
-WORKDIR /app
+WORKDIR /build
 
 RUN apk add --no-cache git
 
-COPY go.mod go.sum* ./
+COPY gw-notification ./gw-notification
 
-COPY . .
+WORKDIR /build/gw-notification
 
-RUN go mod tidy && go mod download && go mod verify
+RUN go mod tidy
+RUN go mod download
+RUN go mod verify
 
 RUN GOOS=linux GOARCH=amd64 go build -o main ./cmd
 
@@ -18,6 +20,6 @@ WORKDIR /app
 
 RUN apk --no-cache add ca-certificates
 
-COPY --from=builder /app/main .
+COPY --from=builder /build/gw-notification/main .
 
 CMD ["./main"]

@@ -2,32 +2,54 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
+	pb "proto-exchange/exchange"
+
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
+
+	"gw-exchanger/internal/config"
+	grpcServer "gw-exchanger/internal/grpc"
+	"gw-exchanger/internal/service"
+	"gw-exchanger/internal/storages/postgres"
 )
 
 func main() {
-	port := os.Getenv("GRPC_PORT")
-	if port == "" {
-		port = "50051"
-	}
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
 
-	lis, err := net.Listen("tcp", ":"+port)
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		logger.Fatal("failed to load config", zap.Error(err))
 	}
 
-	grpcServer := grpc.NewServer()
+	storage, err := postgres.NewPostgresStorage(cfg.GetDBConnectionString())
+	if err != nil {
+		logger.Fatal("failed to connect to database", zap.Error(err))
+	}
+	defer storage.Close()
+
+	logger.Info("Database connected successfully")
+
+	exchangeService := service.NewExchangeService(storage)
+	exchangeServer := grpcServer.NewExchangeServer(exchangeService, logger)
+
+	lis, err := net.Listen("tcp", ":"+cfg.GRPCPort)
+	if err != nil {
+		logger.Fatal("failed to listen", zap.Error(err))
+	}
+
+	grpcSrv := grpc.NewServer()
+	pb.RegisterExchangeServiceServer(grpcSrv, exchangeServer)
 
 	go func() {
-		log.Printf("gRPC server starting on port %s", port)
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("failed to serve: %v", err)
+		logger.Info("gRPC server starting", zap.String("port", cfg.GRPCPort))
+		if err := grpcSrv.Serve(lis); err != nil {
+			logger.Fatal("failed to serve", zap.Error(err))
 		}
 	}()
 
@@ -36,6 +58,6 @@ func main() {
 	<-quit
 
 	fmt.Println("Shutting down gRPC server...")
-	grpcServer.GracefulStop()
+	grpcSrv.GracefulStop()
 	fmt.Println("Server exited gracefully")
 }

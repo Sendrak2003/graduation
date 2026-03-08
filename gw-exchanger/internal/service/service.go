@@ -5,6 +5,11 @@ import (
 	"gw-exchanger/internal/storages"
 )
 
+type ExchangeServiceInterface interface {
+	GetExchangeRate(ctx context.Context, from, to string) (float64, error)
+	GetAllExchangeRates(ctx context.Context) (map[string]float64, error)
+}
+
 type ExchangeService struct {
 	storage storages.Storage
 }

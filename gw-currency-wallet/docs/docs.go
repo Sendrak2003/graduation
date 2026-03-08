@@ -22,7 +22,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Возвращает баланс указанной валюты в кошельке пользователя",
+                "description": "Возвращает баланс всех валют в кошельке пользователя",
                 "consumes": [
                     "application/json"
                 ],
@@ -33,18 +33,58 @@ const docTemplate = `{
                     "wallet"
                 ],
                 "summary": "Получить баланс кошелька",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/exchange": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Обменивает одну валюту на другую по текущему курсу",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "exchange"
+                ],
+                "summary": "Обменять валюту",
                 "parameters": [
                     {
-                        "enum": [
-                            "USD",
-                            "EUR",
-                            "RUB"
-                        ],
-                        "type": "string",
-                        "description": "Валюта",
-                        "name": "currency",
-                        "in": "query",
-                        "required": true
+                        "description": "Данные для обмена",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.ExchangeRequest"
+                        }
                     }
                 ],
                 "responses": {
@@ -57,6 +97,49 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/exchange/rates": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает актуальные курсы обмена всех валют",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "exchange"
+                ],
+                "summary": "Получить курсы валют",
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -105,7 +188,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Access токен",
+                        "description": "OK",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -114,7 +197,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Ошибка валидации",
+                        "description": "Bad Request",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -123,7 +206,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Неверные учетные данные",
+                        "description": "Unauthorized",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -132,7 +215,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Ошибка сервера",
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -169,7 +252,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Новый access токен",
+                        "description": "OK",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -178,7 +261,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Ошибка валидации",
+                        "description": "Bad Request",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -187,7 +270,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Неверный refresh токен",
+                        "description": "Unauthorized",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -196,7 +279,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Ошибка сервера",
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -233,7 +316,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Пользователь успешно зарегистрирован",
+                        "description": "Created",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -242,7 +325,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Ошибка валидации или пользователь уже существует",
+                        "description": "Bad Request",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -251,7 +334,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Ошибка сервера",
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -287,7 +370,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.DepositRequest"
+                            "$ref": "#/definitions/handler.DepositRequest"
                         }
                     }
                 ],
@@ -348,7 +431,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.WithdrawRequest"
+                            "$ref": "#/definitions/handler.WithdrawRequest"
                         }
                     }
                 ],
@@ -386,6 +469,55 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "handler.DepositRequest": {
+            "type": "object",
+            "required": [
+                "amount",
+                "currency"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "currency": {
+                    "type": "string",
+                    "enum": [
+                        "USD",
+                        "EUR",
+                        "RUB"
+                    ]
+                }
+            }
+        },
+        "handler.ExchangeRequest": {
+            "type": "object",
+            "required": [
+                "amount",
+                "from_currency",
+                "to_currency"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "from_currency": {
+                    "type": "string",
+                    "enum": [
+                        "USD",
+                        "EUR",
+                        "RUB"
+                    ]
+                },
+                "to_currency": {
+                    "type": "string",
+                    "enum": [
+                        "USD",
+                        "EUR",
+                        "RUB"
+                    ]
+                }
+            }
+        },
         "handler.LoginRequest": {
             "type": "object",
             "required": [
@@ -435,27 +567,7 @@ const docTemplate = `{
                 }
             }
         },
-        "http.DepositRequest": {
-            "type": "object",
-            "required": [
-                "amount",
-                "currency"
-            ],
-            "properties": {
-                "amount": {
-                    "type": "number"
-                },
-                "currency": {
-                    "type": "string",
-                    "enum": [
-                        "USD",
-                        "EUR",
-                        "RUB"
-                    ]
-                }
-            }
-        },
-        "http.WithdrawRequest": {
+        "handler.WithdrawRequest": {
             "type": "object",
             "required": [
                 "amount",

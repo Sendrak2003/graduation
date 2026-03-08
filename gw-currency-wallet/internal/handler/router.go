@@ -8,16 +8,18 @@ import (
 )
 
 type Handler struct {
-	walletHandler *WalletHandler
-	authHandler   *AuthHandler
-	jwtManager    *auth.Manager
+	walletHandler   *WalletHandler
+	authHandler     *AuthHandler
+	exchangeHandler *ExchangeHandler
+	jwtManager      *auth.Manager
 }
 
-func NewHandler(walletHandler *WalletHandler, authHandler *AuthHandler, jwtManager *auth.Manager) *Handler {
+func NewHandler(walletHandler *WalletHandler, authHandler *AuthHandler, exchangeHandler *ExchangeHandler, jwtManager *auth.Manager) *Handler {
 	return &Handler{
-		walletHandler: walletHandler,
-		authHandler:   authHandler,
-		jwtManager:    jwtManager,
+		walletHandler:   walletHandler,
+		authHandler:     authHandler,
+		exchangeHandler: exchangeHandler,
+		jwtManager:      jwtManager,
 	}
 }
 
@@ -35,7 +37,7 @@ func RegisterRoutes(router *gin.Engine, handler *Handler) {
 		protected.GET("/balance", handler.walletHandler.GetBalance)
 		protected.POST("/wallet/deposit", handler.walletHandler.Deposit)
 		protected.POST("/wallet/withdraw", handler.walletHandler.Withdraw)
-		//protected.GET("/exchange/rates", handler.GetRates)
-		//protected.POST("/exchange", handler.Exchange)
+		protected.GET("/exchange/rates", handler.exchangeHandler.GetExchangeRates)
+		protected.POST("/exchange", handler.exchangeHandler.Exchange)
 	}
 }

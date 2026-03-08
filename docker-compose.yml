@@ -35,6 +35,7 @@ services:
     volumes:
       - postgres-exchanger-data:/var/lib/postgresql/data
       - ./gw-exchanger/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+      - ./gw-exchanger/migrations/002_seed_data.sql:/docker-entrypoint-initdb.d/002_seed_data.sql:ro
       - ./gw-exchanger/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     networks:
       - microservices-network
@@ -85,6 +86,7 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
     networks:
       - microservices-network
     healthcheck:
@@ -95,8 +97,8 @@ services:
 
   gw-exchanger:
     build:
-      context: ./gw-exchanger
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./gw-exchanger/Dockerfile
     container_name: gw-exchanger
     env_file:
       - gw-exchanger/config.env
@@ -113,14 +115,14 @@ services:
 
   gw-currency-wallet:
     build:
-      context: ./gw-currency-wallet
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./gw-currency-wallet/Dockerfile
     container_name: gw-currency-wallet
     env_file:
       - gw-currency-wallet/config.env
     environment:
       DB_HOST: postgres-wallet
-      EXCHANGER_GRPC_HOST: gw-exchanger
+      EXCHANGER_GRPC_ADDRESS: gw-exchanger:50051
       KAFKA_BROKERS: kafka:29092
     depends_on:
       postgres-wallet:
@@ -137,8 +139,8 @@ services:
 
   gw-notification:
     build:
-      context: ./gw-notification
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./gw-notification/Dockerfile
     container_name: gw-notification
     env_file:
       - gw-notification/config.env

@@ -1,5 +1,40 @@
 basePath: /api/v1
 definitions:
+  handler.DepositRequest:
+    properties:
+      amount:
+        type: number
+      currency:
+        enum:
+        - USD
+        - EUR
+        - RUB
+        type: string
+    required:
+    - amount
+    - currency
+    type: object
+  handler.ExchangeRequest:
+    properties:
+      amount:
+        type: number
+      from_currency:
+        enum:
+        - USD
+        - EUR
+        - RUB
+        type: string
+      to_currency:
+        enum:
+        - USD
+        - EUR
+        - RUB
+        type: string
+    required:
+    - amount
+    - from_currency
+    - to_currency
+    type: object
   handler.LoginRequest:
     properties:
       password:
@@ -34,21 +69,7 @@ definitions:
     - password
     - username
     type: object
-  http.DepositRequest:
-    properties:
-      amount:
-        type: number
-      currency:
-        enum:
-        - USD
-        - EUR
-        - RUB
-        type: string
-    required:
-    - amount
-    - currency
-    type: object
-  http.WithdrawRequest:
+  handler.WithdrawRequest:
     properties:
       amount:
         type: number
@@ -73,17 +94,42 @@ paths:
     get:
       consumes:
       - application/json
-      description: Возвращает баланс указанной валюты в кошельке пользователя
+      description: Возвращает баланс всех валют в кошельке пользователя
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить баланс кошелька
+      tags:
+      - wallet
+  /exchange:
+    post:
+      consumes:
+      - application/json
+      description: Обменивает одну валюту на другую по текущему курсу
       parameters:
-      - description: Валюта
-        enum:
-        - USD
-        - EUR
-        - RUB
-        in: query
-        name: currency
+      - description: Данные для обмена
+        in: body
+        name: request
         required: true
-        type: string
+        schema:
+          $ref: '#/definitions/handler.ExchangeRequest'
       produces:
       - application/json
       responses:
@@ -109,9 +155,37 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: Получить баланс кошелька
+      summary: Обменять валюту
       tags:
-      - wallet
+      - exchange
+  /exchange/rates:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает актуальные курсы обмена всех валют
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить курсы валют
+      tags:
+      - exchange
   /login:
     post:
       consumes:
@@ -128,25 +202,25 @@ paths:
       - application/json
       responses:
         "200":
-          description: Access токен
+          description: OK
           schema:
             additionalProperties:
               type: string
             type: object
         "400":
-          description: Ошибка валидации
+          description: Bad Request
           schema:
             additionalProperties:
               type: string
             type: object
         "401":
-          description: Неверные учетные данные
+          description: Unauthorized
           schema:
             additionalProperties:
               type: string
             type: object
         "500":
-          description: Ошибка сервера
+          description: Internal Server Error
           schema:
             additionalProperties:
               type: string
@@ -170,25 +244,25 @@ paths:
       - application/json
       responses:
         "200":
-          description: Новый access токен
+          description: OK
           schema:
             additionalProperties:
               type: string
             type: object
         "400":
-          description: Ошибка валидации
+          description: Bad Request
           schema:
             additionalProperties:
               type: string
             type: object
         "401":
-          description: Неверный refresh токен
+          description: Unauthorized
           schema:
             additionalProperties:
               type: string
             type: object
         "500":
-          description: Ошибка сервера
+          description: Internal Server Error
           schema:
             additionalProperties:
               type: string
@@ -212,19 +286,19 @@ paths:
       - application/json
       responses:
         "201":
-          description: Пользователь успешно зарегистрирован
+          description: Created
           schema:
             additionalProperties:
               type: string
             type: object
         "400":
-          description: Ошибка валидации или пользователь уже существует
+          description: Bad Request
           schema:
             additionalProperties:
               type: string
             type: object
         "500":
-          description: Ошибка сервера
+          description: Internal Server Error
           schema:
             additionalProperties:
               type: string
@@ -243,7 +317,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/http.DepositRequest'
+          $ref: '#/definitions/handler.DepositRequest'
       produces:
       - application/json
       responses:
@@ -283,7 +357,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/http.WithdrawRequest'
+          $ref: '#/definitions/handler.WithdrawRequest'
       produces:
       - application/json
       responses:

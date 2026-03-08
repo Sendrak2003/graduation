@@ -18,7 +18,9 @@ import (
 
 	_ "gw-currency-wallet/docs"
 	"gw-currency-wallet/internal/config"
+	"gw-currency-wallet/internal/grpc"
 	"gw-currency-wallet/internal/handler"
+	"gw-currency-wallet/internal/kafka"
 	"gw-currency-wallet/internal/middleware"
 	"gw-currency-wallet/internal/repository"
 	"gw-currency-wallet/internal/service"
@@ -70,6 +72,36 @@ func main() {
 
 	logger.Info("Database connected successfully")
 
+	kafkaBrokers := os.Getenv("KAFKA_BROKERS")
+	if kafkaBrokers == "" {
+		kafkaBrokers = "kafka:9092"
+	}
+
+	kafkaTopic := os.Getenv("KAFKA_TOPIC")
+	if kafkaTopic == "" {
+		kafkaTopic = "large-transactions"
+	}
+
+	kafkaProducer := kafka.NewProducer(kafkaBrokers, kafkaTopic, logger)
+	defer kafkaProducer.Close()
+
+	logger.Info("Kafka producer initialized",
+		zap.String("brokers", kafkaBrokers),
+		zap.String("topic", kafkaTopic))
+
+	exchangerAddress := os.Getenv("EXCHANGER_GRPC_ADDRESS")
+	if exchangerAddress == "" {
+		exchangerAddress = "gw-exchanger:50051"
+	}
+
+	grpcClient, err := grpc.NewExchangeClient(exchangerAddress, logger)
+	if err != nil {
+		logger.Warn("failed to create grpc client, exchange functionality will be disabled", zap.Error(err))
+		grpcClient = nil
+	} else {
+		logger.Info("gRPC client initialized", zap.String("address", exchangerAddress))
+	}
+
 	authCfg := config.LoadAuth()
 	jwtManager := auth.New(
 		authCfg.Secret,
@@ -79,11 +111,17 @@ func main() {
 
 	repos := repository.NewRepositories(db)
 
-	services := service.NewServices(repos, jwtManager, logger)
+	services := service.NewServices(repos, jwtManager, kafkaProducer, grpcClient, logger)
 
 	authHandler := handler.NewAuthHandler(services.UserService, jwtManager, logger)
 	walletHandler := handler.NewWalletHandler(services.WalletService, logger)
-	mainHandler := handler.NewHandler(walletHandler, authHandler, jwtManager)
+	exchangeHandler := handler.NewExchangeHandler(services.ExchangeService, logger)
+
+	if grpcClient != nil {
+		defer grpcClient.Close()
+	}
+
+	mainHandler := handler.NewHandler(walletHandler, authHandler, exchangeHandler, jwtManager)
 
 	router := gin.Default()
 

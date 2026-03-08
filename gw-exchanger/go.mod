@@ -1,13 +1,18 @@
 module gw-exchanger
 
-go 1.24.0
+go 1.23
 
 require (
 	github.com/lib/pq v1.11.2
-	google.golang.org/grpc v1.79.1
+	go.uber.org/zap v1.27.1
+	google.golang.org/grpc v1.79.2
+	proto-exchange v0.0.0
 )
 
+replace proto-exchange => ../proto-exchange
+
 require (
+	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
